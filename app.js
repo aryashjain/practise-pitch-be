@@ -3,6 +3,7 @@ import aiRouter from './routes/ai-router.js';
 import authRouter, { authMiddleware } from
 './routes/auth-router.js';
 import resultsRouter from './routes/results-router.js';
+import heal from './routes/health.js';
 
 const app = express();
 
@@ -24,6 +25,7 @@ next();
 });
 
 // Routes
+app.use('', heal)
 app.use('/api', authRouter); // /api/public, /api/protected
 app.use('/api/ai', authMiddleware, aiRouter);
 app.use('/api/results', authMiddleware, resultsRouter);
