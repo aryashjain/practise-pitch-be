@@ -49,6 +49,15 @@ router.post('/generate-questions', async (req, res) => {
             questionType = "MCQ" // Default to MCQ
         } = req.body;
 
+        // Normalize language input; default to English, support 'English' or 'Hindi'
+        const languageInput = (req.body?.language ?? 'English');
+        const normalizedLanguageInput = (typeof languageInput === 'string' ? languageInput : 'English').trim().toLowerCase();
+        const language = normalizedLanguageInput.startsWith('hi') ? 'Hindi' : 'English';
+
+        // Normalize q_no to a positive integer (fallback to 5 if null/invalid)
+        const requestedNum = Number(q_no);
+        const numQuestions = Number.isFinite(requestedNum) && requestedNum > 0 ? Math.floor(requestedNum) : 5;
+
         if (!exam || !topic) {
             return res.status(400).json({ 
                 status: "error", 
@@ -59,15 +68,15 @@ router.post('/generate-questions', async (req, res) => {
         // 2. Build the dynamic prompt for Gemini
         
         // Base instructions for the AI
-        const basePrompt = `You are an expert AI exam assistant. Your task is to generate ${q_no} ${exam}-style questions on the topic of ${topic}. The difficulty must be ${difficulty}. The questions should be relevant and mimic the style of previous years' questions.`;
+        const basePrompt = `You are an expert AI exam assistant. Your task is to generate ${numQuestions} ${exam}-style questions on the topic of ${topic}. The difficulty must be ${difficulty}. The questions should be relevant and mimic the style of previous years' questions. Write ALL content strictly in ${language}. Do not use any other language. If Hindi is requested, use standard Devanagari script.`;
         
         let formatInstructions;
 
         // Dynamically set the format instructions based on questionType
         if (questionType.toUpperCase() === 'MCQ') {
-            formatInstructions = `You MUST return ONLY a single-line, minified JSON string. Do not use any newline characters like \\n or tab characters like \\t. Do not use any escaping backslashes. The required format is: { "questionType" : "MCQ", "QuestionArray" :[ { "No": 1, "Q": "Question text...", "Options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"] }, { "No": 2, ... } ], "AnswerArray" : ["Correct answer for Q1", "Correct answer for Q2", ...] }`;
+            formatInstructions = `You MUST return ONLY a single-line, minified JSON string. Do not use any newline characters like \\n or tab characters like \\t. Do not use any escaping backslashes. ALL strings (questions, options, answers) must be in ${language}. The required format is: { "questionType" : "MCQ", "QuestionArray" :[ { "No": 1, "Q": "Question text...", "Options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"] }, { "No": 2, ... } ], "AnswerArray" : ["Correct answer for Q1", "Correct answer for Q2", ...] }`;
         } else { // Default to Subjective
-            formatInstructions = `You MUST generate Subjective (long answer) questions. You MUST return ONLY a single-line, minified JSON string. Do not use any newline characters like \\n or tab characters like \\t. Do not use any escaping backslashes. The required format is: { "questionType": "Subjective", "QuestionArray": ["Question 1 text...", "Question 2 text..."] }`;
+            formatInstructions = `You MUST generate Subjective (long answer) questions. You MUST return ONLY a single-line, minified JSON string. Do not use any newline characters like \\n or tab characters like \\t. Do not use any escaping backslashes. ALL strings must be in ${language}. The required format is: { "questionType": "Subjective", "QuestionArray": ["Question 1 text...", "Question 2 text..."] }`;
         }
 
         const finalPrompt = `${basePrompt} ${formatInstructions}`;
